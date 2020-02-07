@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,7 +19,8 @@ static char *inputfile = 0;
 static int parse_parameter (int argcount, char **argvec);
 static void show_usage (void);
 
-int main (int argc, char **argv)
+int
+main (int argc, char **argv)
 {
   MS3Record *msr = 0;
   uint32_t flags = 0;
@@ -27,7 +29,8 @@ int main (int argc, char **argv)
   int64_t totalsamps = 0;
   int retcode;
 
-  int64_t temp = 1; // Currently only choose the first record
+  int64_t temp = 1; /* Currently only choose the first record */
+  //double rms = 0;
 
   /* Process given parameters (command line and parameter file) */
   if (parse_parameter (argc, argv) < 0)
@@ -89,7 +92,7 @@ int main (int argc, char **argv)
       }
     }
 
-    // <---
+    /* <--- */
     if (totalrecs >= temp)
     {
       break;
@@ -114,7 +117,8 @@ int main (int argc, char **argv)
  *
  * Return 0 on success, and -1 on failure.
  ***************************************************************************/
-static int parse_parameter (int argcount, char **argvec)
+static int
+parse_parameter (int argcount, char **argvec)
 {
   int counter;
 
@@ -167,7 +171,8 @@ static int parse_parameter (int argcount, char **argvec)
  * show_usage():
  * Print the usage message and exit.
  ***************************************************************************/
-static void show_usage (void)
+static void
+show_usage (void)
 {
   fprintf (stderr, "%s version: %s\n\n", PROGRAMNAME, VERSION);
   fprintf (stderr, "Usage: %s [options] file\n\n", PROGRAMNAME);
