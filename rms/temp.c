@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include <math.h>
 
 #include <libmseed.h>
 
@@ -10,7 +11,7 @@ int main(int argc, char **argv)
   MS3TraceList *mstl = NULL;
   MS3TraceID *tid = NULL;
   MS3TraceSeg *seg = NULL;
-  MS3RecordPtr *recptr = NULL;
+  //MS3RecordPtr *recptr = NULL;
 
   char *mseedfile = NULL;
   char starttimestr[30];
@@ -20,7 +21,7 @@ int main(int argc, char **argv)
   size_t idx;
   int rv;
 
-  char printdata = 0;
+  char printdata = 'd';
   int64_t unpacked;
   uint8_t samplesize;
   char sampletype;
@@ -28,6 +29,9 @@ int main(int argc, char **argv)
   size_t lines;
   int col;
   void *sptr;
+
+  int32_t *data = (int32_t *)malloc(sizeof(int32_t) * 6);
+  double rms = 0.0f;
 
   if (argc < 2)
   {
@@ -104,6 +108,7 @@ int main(int argc, char **argv)
       ms_log (0, "  Segment %s - %s, samples: %" PRId64 ", sample rate: %g\n",
               starttimestr, endtimestr, seg->samplecnt, seg->samprate);
 
+#if 0
       if (seg->recordlist)
       {
         ms_log (0, "  Record list:\n");
@@ -121,6 +126,7 @@ int main(int argc, char **argv)
           recptr = recptr->next;
         }
       }
+#endif
 
       /* Unpack and print samples for this trace segment */
       if (printdata && seg->recordlist && seg->recordlist->first)
@@ -166,6 +172,8 @@ int main(int argc, char **argv)
                 else if (sampletype == 'd')
                   ms_log (0, "%10.10g  ", *(double *)sptr);
 
+                data[idx] = *(int32_t *)sptr;
+
                 idx++;
               }
               ms_log (0, "\n");
@@ -180,10 +188,33 @@ int main(int argc, char **argv)
       seg = seg->next;
     }
 
+    /* Calculate the RMS */
+    puts("=====");
+    double mean = 0.0f;
+    double sum = 0.0f;
+    for(int i = 0; i < 6; i++)
+    {
+      mean += data[i];
+      printf("%10d  ", data[i]);
+    }
+    printf("\n");
+    mean /= 6;
+    for(int i = 0; i < 6; i++)
+    {
+      data[i] = data[i] - mean;
+      sum += pow(data[i], 2);
+    }
+    rms = pow(sum/6, 0.5);
+    printf("mean %10.10g, sum %10.10g, RMS: %10.10g\n", mean, sum, rms);
+
     tid = tid->next;
   }
 
   /* Make sure everything is cleaned up */
   if (mstl)
     mstl3_free (&mstl, 0);
+
+  free(data);
+
+  return 0;
 }

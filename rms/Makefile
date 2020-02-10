@@ -5,7 +5,7 @@ EXEC = calculate_rms.out
 COMMON = -I/usr/local/include
 CFLAGS = -Wall
 LDFLAGS = -L/usr/local/lib 
-LDLIBS = -lmseed
+LDLIBS = -lmseed -lm
 
 OBJS = temp.o
 
