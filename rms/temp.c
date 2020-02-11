@@ -1,18 +1,19 @@
-#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
-#include <sys/stat.h>
 #include <math.h>
+#include <stdio.h>
+#include <sys/stat.h>
 
 #include <libmseed.h>
 
-double calculateSD(double *data, uint64_t dataSize);
+double calculateSD (double *data, uint64_t dataSize);
 
-int main(int argc, char **argv)
+int
+main (int argc, char **argv)
 {
   MS3TraceList *mstl = NULL;
-  MS3TraceID *tid = NULL;
-  MS3TraceSeg *seg = NULL;
+  MS3TraceID *tid    = NULL;
+  MS3TraceSeg *seg   = NULL;
   //MS3RecordPtr *recptr = NULL;
 
   char *mseedfile = NULL;
@@ -34,7 +35,7 @@ int main(int argc, char **argv)
 
   if (argc < 2)
   {
-    ms_log (2, "Usage: %s <mseedfile> [-v] [-d] [-D]\n",argv[0]);
+    ms_log (2, "Usage: %s <mseedfile> [-v] [-d] [-D]\n", argv[0]);
     return -1;
   }
 
@@ -83,15 +84,15 @@ int main(int argc, char **argv)
 
   if (rv != MS_NOERROR)
   {
-    ms_log (2, "Cannot read miniSEED from file: %s\n", ms_errorstr(rv));
+    ms_log (2, "Cannot read miniSEED from file: %s\n", ms_errorstr (rv));
     return -1;
   }
 
   /* Traverse trace list structures and print summary information */
   tid = mstl->traces;
   while (tid)
-  {   
-    /* allocate the data array of every trace */ 
+  {
+    /* allocate the data array of every trace */
     double *data = NULL;
     uint64_t dataSize;
 
@@ -144,15 +145,15 @@ int main(int argc, char **argv)
 
         /* malloc the data array */
         dataSize = seg->numsamples;
-        if(printdata == 'd')
+        if (printdata == 'd')
         {
-            dataSize = 6;
+          dataSize = 6;
         }
-        data = (double *)malloc(sizeof(double) * dataSize);
-        if(data == NULL)
+        data = (double *)malloc (sizeof (double) * dataSize);
+        if (data == NULL)
         {
-            printf("something wrong when malloc data array\n");
-            exit(-1);
+          printf ("something wrong when malloc data array\n");
+          exit (-1);
         }
 
         if (unpacked != seg->samplecnt)
@@ -212,13 +213,13 @@ int main(int argc, char **argv)
     }
 
     /* print the data samples of every trace */
-    printf("data samples of this trace: %" PRId64 "\n", dataSize);
+    printf ("data samples of this trace: %" PRId64 "\n", dataSize);
     /* Calculate the RMS */
-    printf("RMS of this trace: %lf\n", calculateSD(data, dataSize));
-    printf("\n");
+    printf ("RMS of this trace: %lf\n", calculateSD (data, dataSize));
+    printf ("\n");
 
     /* clean up the data array in the end of every trace */
-    free(data); 
+    free (data);
 
     tid = tid->next;
   }
@@ -228,24 +229,25 @@ int main(int argc, char **argv)
     mstl3_free (&mstl, 0);
 
   double test[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  printf("RMS of test array: %lf\n", calculateSD(test, 10));
+  printf ("RMS of test array: %lf\n", calculateSD (test, 10));
 
   return 0;
 }
 
-double calculateSD(double *data, uint64_t dataSize)
+double
+calculateSD (double *data, uint64_t dataSize)
 {
-    double sum = 0.0, mean, SD = 0.0;
-    uint64_t i;
-    for(i = 0; i < dataSize; i++)
-    {
-        sum += data[i];
-    }
-    mean = sum / (double)dataSize;
-    for(i = 0; i < dataSize; i++)
-    {
-        SD += pow(data[i] - mean, 2);
-    }
-    printf("sum: %lf, mean %lf\n", sum, mean);
-    return sqrt(SD / dataSize);
+  double sum = 0.0, mean, SD = 0.0;
+  uint64_t i;
+  for (i = 0; i < dataSize; i++)
+  {
+    sum += data[i];
+  }
+  mean = sum / (double)dataSize;
+  for (i = 0; i < dataSize; i++)
+  {
+    SD += pow (data[i] - mean, 2);
+  }
+  printf ("sum: %lf, mean %lf\n", sum, mean);
+  return sqrt (SD / dataSize);
 }
