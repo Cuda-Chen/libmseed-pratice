@@ -6,6 +6,8 @@
 
 #include <libmseed.h>
 
+double calculateSD(double *data, uint64_t dataSize);
+
 int main(int argc, char **argv)
 {
   MS3TraceList *mstl = NULL;
@@ -29,9 +31,6 @@ int main(int argc, char **argv)
   size_t lines;
   int col;
   void *sptr;
-
-  int32_t *data = (int32_t *)malloc(sizeof(int32_t) * 6);
-  double rms = 0.0f;
 
   if (argc < 2)
   {
@@ -91,7 +90,11 @@ int main(int argc, char **argv)
   /* Traverse trace list structures and print summary information */
   tid = mstl->traces;
   while (tid)
-  {
+  {   
+    /* allocate the data array of every trace */ 
+    double *data = NULL;
+    uint64_t dataSize;
+
     ms_log (0, "TraceID for %s (%d), segments: %u\n",
             tid->sid, tid->pubversion, tid->numsegments);
 
@@ -139,6 +142,19 @@ int main(int argc, char **argv)
          * Alternatively, a user-specified data buffer can be provided here. */
         unpacked = mstl3_unpack_recordlist (tid, seg, NULL, 0, verbose);
 
+        /* malloc the data array */
+        dataSize = seg->numsamples;
+        if(printdata == 'd')
+        {
+            dataSize = 6;
+        }
+        data = (double *)malloc(sizeof(double) * dataSize);
+        if(data == NULL)
+        {
+            printf("something wrong when malloc data array\n");
+            exit(-1);
+        }
+
         if (unpacked != seg->samplecnt)
         {
           ms_log (2, "Cannot unpack samples for %s\n", tid->sid);
@@ -164,15 +180,22 @@ int main(int argc, char **argv)
                 sptr = (char *)seg->datasamples + (idx * samplesize);
 
                 if (sampletype == 'i')
+                {
                   ms_log (0, "%10d  ", *(int32_t *)sptr);
-
+                  data[idx] = (double)(*(int32_t *)sptr);
+                }
                 else if (sampletype == 'f')
+                {
                   ms_log (0, "%10.8g  ", *(float *)sptr);
-
+                  data[idx] = (double)(*(float *)sptr);
+                }
                 else if (sampletype == 'd')
+                {
                   ms_log (0, "%10.10g  ", *(double *)sptr);
+                  data[idx] = (double)(*(double *)sptr);
+                }
 
-                data[idx] = *(int32_t *)sptr;
+                //printf("data[%zu]: %10.10g  ", idx, data[idx]);
 
                 idx++;
               }
@@ -188,24 +211,14 @@ int main(int argc, char **argv)
       seg = seg->next;
     }
 
+    /* print the data samples of every trace */
+    printf("data samples of this trace: %" PRId64 "\n", dataSize);
     /* Calculate the RMS */
-    puts("=====");
-    double mean = 0.0f;
-    double sum = 0.0f;
-    for(int i = 0; i < 6; i++)
-    {
-      mean += data[i];
-      printf("%10d  ", data[i]);
-    }
+    printf("RMS of this trace: %lf\n", calculateSD(data, dataSize));
     printf("\n");
-    mean /= 6;
-    for(int i = 0; i < 6; i++)
-    {
-      data[i] = data[i] - mean;
-      sum += pow(data[i], 2);
-    }
-    rms = pow(sum/6, 0.5);
-    printf("mean %10.10g, sum %10.10g, RMS: %10.10g\n", mean, sum, rms);
+
+    /* clean up the data array in the end of every trace */
+    free(data); 
 
     tid = tid->next;
   }
@@ -214,7 +227,25 @@ int main(int argc, char **argv)
   if (mstl)
     mstl3_free (&mstl, 0);
 
-  free(data);
+  double test[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  printf("RMS of test array: %lf\n", calculateSD(test, 10));
 
   return 0;
+}
+
+double calculateSD(double *data, uint64_t dataSize)
+{
+    double sum = 0.0, mean, SD = 0.0;
+    uint64_t i;
+    for(i = 0; i < dataSize; i++)
+    {
+        sum += data[i];
+    }
+    mean = sum / (double)dataSize;
+    for(i = 0; i < dataSize; i++)
+    {
+        SD += pow(data[i] - mean, 2);
+    }
+    printf("sum: %lf, mean %lf\n", sum, mean);
+    return sqrt(SD / dataSize);
 }
