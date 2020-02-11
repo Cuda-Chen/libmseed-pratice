@@ -7,7 +7,7 @@ CFLAGS = -Wall
 LDFLAGS = -L/usr/local/lib 
 LDLIBS = -lmseed -lm
 
-OBJS = lm_read_selection.o
+OBJS = temp.o
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -O0 -g

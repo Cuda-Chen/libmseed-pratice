@@ -12,12 +12,13 @@ void testCalculateSD ();
 int
 main (int argc, char **argv)
 {
-  MS3TraceList *mstl = NULL;
-  MS3TraceID *tid    = NULL;
-  MS3TraceSeg *seg   = NULL;
-  //MS3RecordPtr *recptr = NULL;
+  MS3TraceList *mstl        = NULL;
+  MS3TraceID *tid           = NULL;
+  MS3TraceSeg *seg          = NULL;
+  MS3Selections *selections = NULL;
 
-  char *mseedfile = NULL;
+  char *mseedfile     = NULL;
+  char *selectionfile = NULL;
   char starttimestr[30];
   char endtimestr[30];
   uint32_t flags = 0;
@@ -25,7 +26,6 @@ main (int argc, char **argv)
   size_t idx;
   int rv;
 
-  char printdata = 'd';
   int64_t unpacked;
   uint8_t samplesize;
   char sampletype;
@@ -36,31 +36,12 @@ main (int argc, char **argv)
 
   if (argc < 2)
   {
-    ms_log (2, "Usage: %s <mseedfile> [-v] [-d] [-D]\n", argv[0]);
+    ms_log (2, "Usage: %s <mseedfile> <selectionfile>\n", argv[0]);
     return -1;
   }
 
   /* Simplistic argument parsing */
-  mseedfile = argv[1];
-  for (idx = 2; idx < argc; idx++)
-  {
-    if (strncmp (argv[idx], "-v", 2) == 0)
-      verbose += strspn (&argv[idx][1], "v");
-    else if (strncmp (argv[idx], "-d", 2) == 0)
-      printdata = 'd';
-    else if (strncmp (argv[idx], "-D", 2) == 0)
-      printdata = 'D';
-  }
-
-#if 0
-  if (argc < 2)
-  {
-    ms_log (2, "Usage: %s <mseedfile> <selectionfile>\n",argv[0]);
-    return -1;
-  }
-
-  /* Simplistic argument parsing */
-  mseedfile = argv[1];
+  mseedfile     = argv[1];
   selectionfile = argv[2];
   /* Read data selections from specified file */
   if (ms3_readselectionsfile (&selections, selectionfile) < 0)
@@ -68,7 +49,6 @@ main (int argc, char **argv)
     ms_log (2, "Cannot read data selection file\n");
     return -1;
   }
-#endif
 
   /* Set bit flag to validate CRC */
   flags |= MSF_VALIDATECRC;
@@ -77,11 +57,8 @@ main (int argc, char **argv)
   flags |= MSF_RECORDLIST;
 
   /* Read all miniSEED into a trace list, limiting to selections */
-  rv = ms3_readtracelist (&mstl, mseedfile, NULL, 0, flags, verbose);
-#if 0
   rv = ms3_readtracelist_selection (&mstl, mseedfile, NULL,
                                     selections, 0, flags, verbose);
-#endif
 
   if (rv != MS_NOERROR)
   {
@@ -114,7 +91,7 @@ main (int argc, char **argv)
               starttimestr, endtimestr, seg->samplecnt, seg->samprate);
 
       /* Unpack and print samples for this trace segment */
-      if (printdata && seg->recordlist && seg->recordlist->first)
+      if (seg->recordlist && seg->recordlist->first)
       {
         /* Determine sample size and type based on encoding of first record */
         ms_encoding_sizetype (seg->recordlist->first->msr->encoding, &samplesize, &sampletype);
@@ -126,11 +103,7 @@ main (int argc, char **argv)
 
         /* malloc the data array */
         dataSize = seg->numsamples;
-        if (printdata == 'd')
-        {
-          dataSize = 6;
-        }
-        data = (double *)malloc (sizeof (double) * dataSize);
+        data     = (double *)malloc (sizeof (double) * dataSize);
         if (data == NULL)
         {
           printf ("something wrong when malloc data array\n");
@@ -182,9 +155,6 @@ main (int argc, char **argv)
                 idx++;
               }
               ms_log (0, "\n");
-
-              if (printdata == 'd')
-                break;
             }
           }
         }
