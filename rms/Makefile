@@ -7,7 +7,7 @@ CFLAGS = -Wall
 LDFLAGS = -L/usr/local/lib 
 LDLIBS = -lmseed -lm
 
-OBJS = temp.o
+OBJS = main.o
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -O0 -g

@@ -1,187 +1,208 @@
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
+#include <sys/stat.h>
 
-#include "libmseed.h"
+#include <libmseed.h>
 
-#define VERSION "[libmseed " LIBMSEED_VERSION "]"
-#define PROGRAMNAME "libmseed_hello_world"
-
-static int8_t verbose  = 0;
-static int8_t ppackets = 0;
-static int8_t basicsum = 0;
-static int printdata   = 0;
-static char *inputfile = 0;
-
-static int parse_parameter (int argcount, char **argvec);
-static void show_usage (void);
+double calculateSD (double *data, uint64_t dataSize);
+void testCalculateSD ();
 
 int
 main (int argc, char **argv)
 {
-  MS3Record *msr = 0;
+  MS3TraceList *mstl        = NULL;
+  MS3TraceID *tid           = NULL;
+  MS3TraceSeg *seg          = NULL;
+  MS3Selections *selections = NULL;
+
+  char *mseedfile     = NULL;
+  char *selectionfile = NULL;
+  char starttimestr[30];
+  char endtimestr[30];
   uint32_t flags = 0;
+  int8_t verbose = 0;
+  size_t idx;
+  int rv;
 
-  int64_t totalrecs  = 0;
-  int64_t totalsamps = 0;
-  int retcode;
+  int64_t unpacked;
+  uint8_t samplesize;
+  char sampletype;
+  size_t lineidx;
+  size_t lines;
+  int col;
+  void *sptr;
 
-  int64_t temp = 1; /* Currently only choose the first record */
-  //double rms = 0;
-
-  /* Process given parameters (command line and parameter file) */
-  if (parse_parameter (argc, argv) < 0)
+  if (argc < 2)
+  {
+    ms_log (2, "Usage: %s <mseedfile> <selectionfile>\n", argv[0]);
     return -1;
+  }
 
-  /* Set flag to validate CRCs when reading */
+  /* Simplistic argument parsing */
+  mseedfile     = argv[1];
+  selectionfile = argv[2];
+  /* Read data selections from specified file */
+  if (ms3_readselectionsfile (&selections, selectionfile) < 0)
+  {
+    ms_log (2, "Cannot read data selection file\n");
+    return -1;
+  }
+
+  /* Set bit flag to validate CRC */
   flags |= MSF_VALIDATECRC;
 
-  /* Set flag to unpack data if printing samples */
-  if (printdata)
-    flags |= MSF_UNPACKDATA;
+  /* Set bit flag to build a record list */
+  flags |= MSF_RECORDLIST;
 
-  /* Loop over the input file record by record */
-  while ((retcode = ms3_readmsr (&msr, inputfile, NULL, NULL,
-                                 flags, verbose)) == MS_NOERROR)
+  /* Read all miniSEED into a trace list, limiting to selections */
+  rv = ms3_readtracelist_selection (&mstl, mseedfile, NULL,
+                                    selections, 0, flags, verbose);
+
+  if (rv != MS_NOERROR)
   {
-    totalrecs++;
-    totalsamps += msr->samplecnt;
+    ms_log (2, "Cannot read miniSEED from file: %s\n", ms_errorstr (rv));
+    return -1;
+  }
 
-    msr3_print (msr, ppackets);
+  /* Traverse trace list structures and print summary information */
+  tid = mstl->traces;
+  while (tid)
+  {
+    /* allocate the data array of every trace */
+    double *data = NULL;
+    uint64_t dataSize;
 
-    /* Print each data samples and its corresponding RMS value */
-    if (printdata && msr->numsamples > 0)
+    ms_log (0, "TraceID for %s (%d), segments: %u\n",
+            tid->sid, tid->pubversion, tid->numsegments);
+
+    seg = tid->first;
+    while (seg)
     {
-      int line, col, cnt, samplesize;
-      int lines = (msr->numsamples / 6) + 1;
-      void *sptr;
-
-      if ((samplesize = ms_samplesize (msr->sampletype)) == 0)
+      if (!ms_nstime2timestr (seg->starttime, starttimestr, ISOMONTHDAY, NANO) ||
+          !ms_nstime2timestr (seg->endtime, endtimestr, ISOMONTHDAY, NANO))
       {
-        ms_log (2, "Unrecognized sample type: '%c'\n", msr->sampletype);
+        ms_log (2, "Cannot create time strings\n");
+        starttimestr[0] = endtimestr[0] = '\0';
       }
 
-      for (cnt = 0, line = 0; line < lines; line++)
+      ms_log (0, "  Segment %s - %s, samples: %" PRId64 ", sample rate: %g\n",
+              starttimestr, endtimestr, seg->samplecnt, seg->samprate);
+
+      /* Unpack and print samples for this trace segment */
+      if (seg->recordlist && seg->recordlist->first)
       {
-        for (col = 0; col < 6; col++)
+        /* Determine sample size and type based on encoding of first record */
+        ms_encoding_sizetype (seg->recordlist->first->msr->encoding, &samplesize, &sampletype);
+
+        /* Unpack data samples using record list.
+         * No data buffer is supplied, so it will be allocated and assigned to the segment.
+         * Alternatively, a user-specified data buffer can be provided here. */
+        unpacked = mstl3_unpack_recordlist (tid, seg, NULL, 0, verbose);
+
+        /* malloc the data array */
+        dataSize = seg->numsamples;
+        data     = (double *)malloc (sizeof (double) * dataSize);
+        if (data == NULL)
         {
-          if (cnt < msr->numsamples)
+          printf ("something wrong when malloc data array\n");
+          exit (-1);
+        }
+
+        if (unpacked != seg->samplecnt)
+        {
+          ms_log (2, "Cannot unpack samples for %s\n", tid->sid);
+        }
+        else
+        {
+          ms_log (0, "DATA (%" PRId64 " samples) of type '%c':\n", seg->numsamples, seg->sampletype);
+
+          if (sampletype == 'a')
           {
-            sptr = (char *)msr->datasamples + (cnt * samplesize);
+            printf ("%*s",
+                    (seg->numsamples > INT_MAX) ? INT_MAX : (int)seg->numsamples,
+                    (char *)seg->datasamples);
+          }
+          else
+          {
+            lines = (unpacked / 6) + 1;
 
-            if (msr->sampletype == 'i')
+            for (idx = 0, lineidx = 0; lineidx < lines; lineidx++)
             {
-              ms_log (0, "%10d  ", *(int32_t *)sptr);
-            }
-            else if (msr->sampletype == 'f')
-            {
-              ms_log (0, "%10.8g  ", *(float *)sptr);
-            }
-            else if (msr->sampletype == 'd')
-            {
-              ms_log (0, "%10.10g  ", *(double *)sptr);
-            }
+              for (col = 0; col < 6 && idx < seg->numsamples; col++)
+              {
+                sptr = (char *)seg->datasamples + (idx * samplesize);
 
-            cnt++;
+                if (sampletype == 'i')
+                {
+                  ms_log (0, "%10d  ", *(int32_t *)sptr);
+                  data[idx] = (double)(*(int32_t *)sptr);
+                }
+                else if (sampletype == 'f')
+                {
+                  ms_log (0, "%10.8g  ", *(float *)sptr);
+                  data[idx] = (double)(*(float *)sptr);
+                }
+                else if (sampletype == 'd')
+                {
+                  ms_log (0, "%10.10g  ", *(double *)sptr);
+                  data[idx] = (double)(*(double *)sptr);
+                }
+
+                //printf("data[%zu]: %10.10g  ", idx, data[idx]);
+
+                idx++;
+              }
+              ms_log (0, "\n");
+            }
           }
         }
-        ms_log (0, "\n");
       }
+
+      seg = seg->next;
     }
 
-    /* <--- */
-    if (totalrecs >= temp)
-    {
-      break;
-    }
+    /* print the data samples of every trace */
+    printf ("data samples of this trace: %" PRId64 "\n", dataSize);
+    /* Calculate the RMS */
+    printf ("RMS of this trace: %lf\n", calculateSD (data, dataSize));
+    printf ("\n");
+
+    /* clean up the data array in the end of every trace */
+    free (data);
+
+    tid = tid->next;
   }
 
   /* Make sure everything is cleaned up */
-  ms3_readmsr (&msr, NULL, NULL, NULL, 0, 0);
-
-  if (basicsum)
-  {
-    ms_log (1, "Records: %" PRId64 ", Samples: %" PRId64 "\n",
-            totalrecs, totalsamps);
-  }
+  if (mstl)
+    mstl3_free (&mstl, 0);
 
   return 0;
 }
 
-/***************************************************************************
- * parse_parameter():
- * Parse the command line parameters.
- *
- * Return 0 on success, and -1 on failure.
- ***************************************************************************/
-static int
-parse_parameter (int argcount, char **argvec)
+double
+calculateSD (double *data, uint64_t dataSize)
 {
-  int counter;
-
-  /* Try to parse all command line arguments. */
-  for (counter = 1; counter < argcount; counter++)
+  double sum = 0.0, mean, SD = 0.0;
+  uint64_t i;
+  for (i = 0; i < dataSize; i++)
   {
-    if (strcmp (argvec[counter], "-h") == 0)
-    {
-      show_usage ();
-      exit (0);
-    }
-    else if (strncmp (argvec[counter], "-D", 2) == 0)
-    {
-      printdata = 1;
-    }
-    else if (strcmp (argvec[counter], "-s") == 0)
-    {
-      basicsum = 1;
-    }
-    else if (strncmp (argvec[counter], "-", 1) == 0 &&
-             strlen (argvec[counter]) > 1)
-    {
-      ms_log (2, "Unknown option: %s\n", argvec[counter]);
-      exit (1);
-    }
-    else if (inputfile == 0)
-    {
-      inputfile = argvec[counter];
-    }
-    else
-    {
-      ms_log (2, "Unknown option: %s\n", argvec[counter]);
-      exit (1);
-    }
+    sum += data[i];
   }
-
-  /* Make sure an inputfile was specified */
-  if (!inputfile)
+  mean = sum / (double)dataSize;
+  for (i = 0; i < dataSize; i++)
   {
-    ms_log (2, "No input file was specified\n\n");
-    ms_log (1, "%s version %s\n\n", PROGRAMNAME, VERSION);
-    ms_log (1, "Try %s -h for usage\n", PROGRAMNAME);
-    exit (1);
+    SD += pow (data[i] - mean, 2);
   }
+  printf ("sum: %lf, mean %lf\n", sum, mean);
+  return sqrt (SD / dataSize);
+}
 
-  return 0;
-} /* End of parse_parameter() */
-
-/***************************************************************************
- * show_usage():
- * Print the usage message and exit.
- ***************************************************************************/
-static void
-show_usage (void)
+void
+testCalculateSD ()
 {
-  fprintf (stderr, "%s version: %s\n\n", PROGRAMNAME, VERSION);
-  fprintf (stderr, "Usage: %s [options] file\n\n", PROGRAMNAME);
-  fprintf (stderr,
-           " ## Options ##\n"
-           " -h             Show this usage message\n"
-           " -D             Print all sample values\n"
-           " -s             Print a basic summary after processing a file\n"
-           "\n"
-           " file           File of miniSEED records\n"
-           "\n");
-} /* End of show_usage() */
+  double test[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  printf ("RMS of test array: %lf\n", calculateSD (test, 10));
+}
