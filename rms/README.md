@@ -10,6 +10,7 @@ $ ./calculate_rms.out <mseedfile> <selectionfile>
 # Format of selectionfile
 As specified in `ms3_readselectionsfile()` in [here](https://iris-edu.github.io/libmseed/group__data-selections.html#gaf8aa9de2cbbc18bc96fe3c4f0dfcb92d), you should give one of the following format:
 1. `SourceID [Starttime [Endtime [Pubversion]]]`
+    * `testSelect.txt` provides an example of this format.
 2. `Network Station Location Channel [Pubversion [Starttime [Endtime]]]`
 
 What more, the `Starttime` and `Endtime` values must be one of the 
