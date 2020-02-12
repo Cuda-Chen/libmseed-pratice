@@ -14,6 +14,6 @@ As specified in `ms3_readselectionsfile()` in [here](https://iris-edu.github.io/
 
 What more, the `Starttime` and `Endtime` values must be one of the 
 format recognized by [ms_timestr2nstime()](https://iris-edu.github.io/libmseed/group__time-related.html#ga5970fa0256338e4964e25941eac6c01e)
-and include a full data (i.e., just a year is not allowed).
+and include a full date (i.e., just a year is not allowed).
 
 As a special case, selection lines will be read from `stdin` if the name selectionfile is `-`.
