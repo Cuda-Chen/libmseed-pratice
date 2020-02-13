@@ -116,7 +116,7 @@ main (int argc, char **argv)
         }
         else
         {
-          ms_log (0, "DATA (%" PRId64 " samples) of type '%c':\n", seg->numsamples, seg->sampletype);
+          //ms_log (0, "DATA (%" PRId64 " samples) of type '%c':\n", seg->numsamples, seg->sampletype);
 
           if (sampletype == 'a')
           {
@@ -136,17 +136,17 @@ main (int argc, char **argv)
 
                 if (sampletype == 'i')
                 {
-                  ms_log (0, "%10d  ", *(int32_t *)sptr);
+                  //ms_log (0, "%10d  ", *(int32_t *)sptr);
                   data[idx] = (double)(*(int32_t *)sptr);
                 }
                 else if (sampletype == 'f')
                 {
-                  ms_log (0, "%10.8g  ", *(float *)sptr);
+                  //ms_log (0, "%10.8g  ", *(float *)sptr);
                   data[idx] = (double)(*(float *)sptr);
                 }
                 else if (sampletype == 'd')
                 {
-                  ms_log (0, "%10.10g  ", *(double *)sptr);
+                  //ms_log (0, "%10.10g  ", *(double *)sptr);
                   data[idx] = (double)(*(double *)sptr);
                 }
 
@@ -154,7 +154,7 @@ main (int argc, char **argv)
 
                 idx++;
               }
-              ms_log (0, "\n");
+              //ms_log (0, "\n");
             }
           }
         }
@@ -196,7 +196,8 @@ calculateSD (double *data, uint64_t dataSize)
   {
     SD += pow (data[i] - mean, 2);
   }
-  printf ("sum: %lf, mean %lf\n", sum, mean);
+  //printf ("sum: %lf, mean %lf\n", sum, mean);
+  printf ("mean %lf\n", mean);
   return sqrt (SD / dataSize);
 }
 
