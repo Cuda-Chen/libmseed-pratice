@@ -102,7 +102,8 @@ main (int argc, char **argv)
                 if (sampletype == 'i')
                 {
                   //data[idx] = (double)(*(int32_t *)sptr);
-                  (*(int32_t *)sptr) = value;
+                  //(*(int32_t *)sptr) = value;
+                  (*(int32_t *)sptr) *= 2;
                 }
                 else if (sampletype == 'f')
                 {
@@ -129,7 +130,7 @@ main (int argc, char **argv)
 
   /* Write to output miniSeed file */
   int64_t packedrecords = mstl3_writemseed(mstl, output, 1, reclen,
-                                           DE_INT32, MSF_FLUSHDATA, verbose); 
+                                           DE_INT32, MSF_PACKVER2, verbose); 
 
   /* Make sure everything is cleaned up */
   if (mstl)
